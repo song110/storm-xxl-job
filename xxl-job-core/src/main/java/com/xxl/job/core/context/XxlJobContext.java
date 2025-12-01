@@ -27,19 +27,9 @@ public class XxlJobContext {
     // ---------------------- for log ----------------------
 
     /**
-     * log id
+     * job log filename
      */
-    private final long logId;
-
-    /**
-     * log timestamp
-     */
-    private final long logDateTime;
-
-    /**
-     * log filename
-     */
-    private final String logFileName;
+    private final String jobLogFileName;
 
     // ---------------------- for shard ----------------------
 
@@ -71,18 +61,10 @@ public class XxlJobContext {
     private String handleMsg;
 
 
-    public XxlJobContext(long jobId,
-                         String jobParam,
-                         long logId,
-                         long logDateTime,
-                         String logFileName,
-                         int shardIndex, 
-                         int shardTotal) {
+    public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal) {
         this.jobId = jobId;
         this.jobParam = jobParam;
-        this.logId = logId;
-        this.logDateTime = logDateTime;
-        this.logFileName = logFileName;
+        this.jobLogFileName = jobLogFileName;
         this.shardIndex = shardIndex;
         this.shardTotal = shardTotal;
 
@@ -97,16 +79,8 @@ public class XxlJobContext {
         return jobParam;
     }
 
-    public long getLogId() {
-        return logId;
-    }
-
-    public long getLogDateTime() {
-        return logDateTime;
-    }
-
-    public String getLogFileName() {
-        return logFileName;
+    public String getJobLogFileName() {
+        return jobLogFileName;
     }
 
     public int getShardIndex() {
@@ -135,21 +109,12 @@ public class XxlJobContext {
 
     // ---------------------- tool ----------------------
 
-    /**
-     * xxl-job context store
-     */
-    private static final InheritableThreadLocal<XxlJobContext> contextHolder = new InheritableThreadLocal<XxlJobContext>(); // support for child thread of job handler)
+    private static InheritableThreadLocal<XxlJobContext> contextHolder = new InheritableThreadLocal<XxlJobContext>(); // support for child thread of job handler)
 
-    /**
-     * set xxl-job context
-     */
     public static void setXxlJobContext(XxlJobContext xxlJobContext){
         contextHolder.set(xxlJobContext);
     }
 
-    /**
-     * get xxl-job context
-     */
     public static XxlJobContext getXxlJobContext(){
         return contextHolder.get();
     }

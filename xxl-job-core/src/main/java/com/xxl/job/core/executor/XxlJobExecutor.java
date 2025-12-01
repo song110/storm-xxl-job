@@ -1,7 +1,7 @@
 package com.xxl.job.core.executor;
 
-import com.xxl.job.core.constant.Const;
-import com.xxl.job.core.openapi.AdminBiz;
+import com.xxl.job.core.biz.AdminBiz;
+import com.xxl.job.core.biz.client.AdminBizClient;
 import com.xxl.job.core.handler.IJobHandler;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import com.xxl.job.core.handler.impl.MethodJobHandler;
@@ -10,9 +10,8 @@ import com.xxl.job.core.server.EmbedServer;
 import com.xxl.job.core.thread.JobLogFileCleanThread;
 import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.thread.TriggerCallbackThread;
-import com.xxl.tool.core.StringTool;
-import com.xxl.tool.http.HttpTool;
-import com.xxl.tool.http.IPTool;
+import com.xxl.job.core.util.IpUtil;
+import com.xxl.job.core.util.NetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,10 +28,9 @@ import java.util.concurrent.ConcurrentMap;
 public class XxlJobExecutor  {
     private static final Logger logger = LoggerFactory.getLogger(XxlJobExecutor.class);
 
-    // ---------------------- field ----------------------
+    // ---------------------- param ----------------------
     private String adminAddresses;
     private String accessToken;
-    private int timeout;
     private String appname;
     private String address;
     private String ip;
@@ -45,9 +43,6 @@ public class XxlJobExecutor  {
     }
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
-    }
-    public void setTimeout(int timeout) {
-        this.timeout = timeout;
     }
     public void setAppname(String appname) {
         this.appname = appname;
@@ -76,7 +71,7 @@ public class XxlJobExecutor  {
         XxlJobFileAppender.initLogPath(logPath);
 
         // init invoker, admin-client
-        initAdminBizList(adminAddresses, accessToken, timeout);
+        initAdminBizList(adminAddresses, accessToken);
 
 
         // init JobLogFileCleanThread
@@ -94,7 +89,7 @@ public class XxlJobExecutor  {
         stopEmbedServer();
 
         // destroy jobThreadRepository
-        if (!jobThreadRepository.isEmpty()) {
+        if (jobThreadRepository.size() > 0) {
             for (Map.Entry<Integer, JobThread> item: jobThreadRepository.entrySet()) {
                 JobThread oldJobThread = removeJobThread(item.getKey(), "web container destroy and kill the job.");
                 // wait for job thread push result to callback queue
@@ -122,26 +117,13 @@ public class XxlJobExecutor  {
 
     // ---------------------- admin-client (rpc invoker) ----------------------
     private static List<AdminBiz> adminBizList;
-    private void initAdminBizList(String adminAddresses, String accessToken, int timeout) throws Exception {
-        if (StringTool.isNotBlank(adminAddresses)) {
+    private void initAdminBizList(String adminAddresses, String accessToken) throws Exception {
+        if (adminAddresses!=null && adminAddresses.trim().length()>0) {
             for (String address: adminAddresses.trim().split(",")) {
-                if (StringTool.isNotBlank(address)) {
+                if (address!=null && address.trim().length()>0) {
 
-                    // valid
-                    String finalAddress = address.trim();
-                    finalAddress = finalAddress.endsWith("/") ? (finalAddress + "api") : (finalAddress + "/api");
-                    if (!(this.timeout >=1 && this.timeout <= 10)) {
-                        this.timeout = 3;
-                    }
+                    AdminBiz adminBiz = new AdminBizClient(address.trim(), accessToken);
 
-                    // build
-                    AdminBiz adminBiz = HttpTool.createClient()
-                            .url(finalAddress)
-                            .timeout(timeout * 1000)
-                            .header(Const.XXL_JOB_ACCESS_TOKEN, accessToken)
-                            .proxy(AdminBiz.class);
-
-                    // registry
                     if (adminBizList == null) {
                         adminBizList = new ArrayList<AdminBiz>();
                     }
@@ -161,18 +143,17 @@ public class XxlJobExecutor  {
     private void initEmbedServer(String address, String ip, int port, String appname, String accessToken) throws Exception {
 
         // fill ip port
-        port = port>0?port: IPTool.getAvailablePort(9999);
-        ip = StringTool.isNotBlank(ip) ? ip : IPTool.getIp();
+        port = port>0?port: NetUtil.findAvailablePort(9999);
+        ip = (ip!=null&&ip.trim().length()>0)?ip: IpUtil.getIp();
 
         // generate address
-        if (StringTool.isBlank(address)) {
-            // registry-address：default use address to registry , otherwise use ip:port if address is null
-            String ip_port_address = IPTool.toAddressString(ip, port);
+        if (address==null || address.trim().length()==0) {
+            String ip_port_address = IpUtil.getIpPort(ip, port);   // registry-address：default use address to registry , otherwise use ip:port if address is null
             address = "http://{ip_port}/".replace("{ip_port}", ip_port_address);
         }
 
         // accessToken
-        if (StringTool.isBlank(accessToken)) {
+        if (accessToken==null || accessToken.trim().length()==0) {
             logger.warn(">>>>>>>>>>> xxl-job accessToken is empty. To ensure system security, please set the accessToken.");
         }
 
@@ -198,11 +179,11 @@ public class XxlJobExecutor  {
     public static IJobHandler loadJobHandler(String name){
         return jobHandlerRepository.get(name);
     }
-    public static IJobHandler registryJobHandler(String name, IJobHandler jobHandler){
+    public static IJobHandler registJobHandler(String name, IJobHandler jobHandler){
         logger.info(">>>>>>>>>>> xxl-job register jobhandler success, name:{}, jobHandler:{}", name, jobHandler);
         return jobHandlerRepository.put(name, jobHandler);
     }
-    protected void registryJobHandler(XxlJob xxlJob, Object bean, Method executeMethod){
+    protected void registJobHandler(XxlJob xxlJob, Object bean, Method executeMethod){
         if (xxlJob == null) {
             return;
         }
@@ -252,7 +233,7 @@ public class XxlJobExecutor  {
         }
 
         // registry jobhandler
-        registryJobHandler(name, new MethodJobHandler(bean, executeMethod, initMethod, destroyMethod));
+        registJobHandler(name, new MethodJobHandler(bean, executeMethod, initMethod, destroyMethod));
 
     }
 

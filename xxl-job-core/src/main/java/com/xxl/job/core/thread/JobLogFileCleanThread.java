@@ -1,12 +1,13 @@
 package com.xxl.job.core.thread;
 
 import com.xxl.job.core.log.XxlJobFileAppender;
-import com.xxl.tool.core.DateTool;
-import com.xxl.tool.io.FileTool;
+import com.xxl.job.core.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +31,7 @@ public class JobLogFileCleanThread {
 
         // limit min value
         if (logRetentionDays < 3 ) {
-            return;     // effective only when logRetentionDays >= 3
+            return;
         }
 
         localThread = new Thread(new Runnable() {
@@ -51,49 +52,45 @@ public class JobLogFileCleanThread {
 
                             Date todayDate = todayCal.getTime();
 
-                            // clean expired logfile
                             for (File childFile: childDirs) {
 
-                                // valid log-path: must be directory
+                                // valid
                                 if (!childFile.isDirectory()) {
                                     continue;
                                 }
-
-                                // valid day log-path: like "---/2017-12-25/639.log"
-                                if (!childFile.getName().contains("-")) {
+                                if (childFile.getName().indexOf("-") == -1) {
                                     continue;
                                 }
 
-                                // parse create-day of file-path
+                                // file create date
                                 Date logFileCreateDate = null;
                                 try {
-                                    logFileCreateDate = DateTool.parseDate(childFile.getName());
-                                } catch (Exception e) {
+                                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                                    logFileCreateDate = simpleDateFormat.parse(childFile.getName());
+                                } catch (ParseException e) {
                                     logger.error(e.getMessage(), e);
                                 }
                                 if (logFileCreateDate == null) {
                                     continue;
                                 }
 
-                                // check expired
-                                Date expiredDate = DateTool.addDays(logFileCreateDate, logRetentionDays);
-                                if (todayDate.getTime() > expiredDate.getTime()) {
-                                    // expired, remove all log of this day
-                                    FileTool.delete(childFile);
-                                    //FileUtil.deleteRecursively(childFile);
+                                if ((todayDate.getTime()-logFileCreateDate.getTime()) >= logRetentionDays * (24 * 60 * 60 * 1000) ) {
+                                    FileUtil.deleteRecursively(childFile);
                                 }
+
                             }
                         }
 
-                    } catch (Throwable e) {
+                    } catch (Exception e) {
                         if (!toStop) {
                             logger.error(e.getMessage(), e);
                         }
+
                     }
 
                     try {
                         TimeUnit.DAYS.sleep(1);
-                    } catch (Throwable e) {
+                    } catch (InterruptedException e) {
                         if (!toStop) {
                             logger.error(e.getMessage(), e);
                         }

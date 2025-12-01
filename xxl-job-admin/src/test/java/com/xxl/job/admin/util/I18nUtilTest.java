@@ -1,5 +1,6 @@
 package com.xxl.job.admin.util;
 
+import com.xxl.job.admin.core.util.I18nUtil;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
